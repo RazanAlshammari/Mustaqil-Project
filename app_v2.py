@@ -1754,7 +1754,13 @@ function dl() {{
 </script>
 </body></html>"""
         with st.expander("تصدير الفاتورة كملف PDF"):
-            components.html(inv_doc_component, height=760, scrolling=True)
+    st.write("قبل components")
+
+    try:
+        components.html(inv_doc_component, height=760, scrolling=True)
+        st.write("بعد components")
+    except Exception as e:
+        st.exception(e)
 
     st.markdown("---")
     st.markdown("##### سجلّ فواتيرك")
