@@ -19,7 +19,6 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, r2_score, mean_absolute_error, roc_auc_score
 from datetime import datetime, timezone
-import qrcode
 import db
 import os
 
@@ -130,12 +129,9 @@ st.markdown(f"""
     button, input, select, textarea, option, label {{
         font-family: {FONT_FAMILY} !important;
     }}
-    [data-testid="stIconMaterial"], [data-testid="stIconMaterial"] *,
+    [data-testid="stIconMaterial"],
     .material-symbols-rounded, .material-symbols-outlined, .material-icons,
-    span[class*="material-symbols"], span[class*="material-icons"],
-    [data-testid="stExpanderToggleIcon"], [data-testid="stBaseButton-headerNoPadding"] *,
-    [data-testid="stSidebarCollapseButton"] *, [data-testid="stSidebarCollapsedControl"] *,
-    [data-baseweb="icon"], [data-baseweb="icon"] *, svg, svg * {{
+    span[class*="material-symbols"], span[class*="material-icons"] {{
         font-family: "Material Symbols Rounded", "Material Symbols Outlined",
                      "Material Icons" !important;
     }}
@@ -633,12 +629,6 @@ def zatca_tlv_payload(seller_name, vat_number, timestamp_iso, total_incl_vat, va
     payload = (_tlv(1, seller_name) + _tlv(2, vat_number) + _tlv(3, timestamp_iso) +
                _tlv(4, f"{total_incl_vat:.2f}") + _tlv(5, f"{vat_amount:.2f}"))
     return base64.b64encode(payload).decode()
-
-def make_qr_png_b64(content):
-    """يحوّل أي نص إلى صورة QR بصيغة PNG مُرمَّزة Base64."""
-    img = qrcode.make(content)
-    buf = io.BytesIO(); img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode()
 
 # ═══════════════════════════════════════════════════════════════
 #  التبويبات
@@ -1686,29 +1676,13 @@ with tab_invoice:
     tc3.markdown(f'<div class="metric-card"><div class="metric-label">الإجمالي شامل الضريبة</div>'
                 f'<div class="metric-val">{total_incl_vat:,.2f} {RIYAL}</div></div>', unsafe_allow_html=True)
 
-    if st.button("إصدار الفاتورة وتوليد رمز QR"):
+    if st.button("إصدار الفاتورة"):
         payload_b64 = zatca_tlv_payload(uname, inv_vat_number, issued_at,
                                         total_incl_vat, vat_amount)
-        # رمز QR الظاهر للمستخدم يحمل ملخّصاً مقروءاً للفاتورة كي يعرضه أي جوال
-        # عند المسح مباشرةً، بدل حمولة TLV الثنائية التي لا تُقرأ إلا آلياً
-        # (هي محفوظة أدناه وفي قاعدة البيانات لأغراض التوثيق التقني).
-        readable_summary = (
-            f"فاتورة مستقل | Mustaqil\n"
-            f"رقم الفاتورة: {inv_number}\n"
-            f"البائع: {uname} ({specialty})\n"
-            f"الرقم الضريبي للبائع: {inv_vat_number}\n"
-            f"العميل: {inv_client}\n"
-            f"الوصف: {inv_desc}\n"
-            f"التاريخ: {issued_at}\n"
-            f"المبلغ قبل الضريبة: {inv_amount:,.2f} ريال\n"
-            f"ضريبة القيمة المضافة (15%): {vat_amount:,.2f} ريال\n"
-            f"الإجمالي شامل الضريبة: {total_incl_vat:,.2f} ريال"
-        )
-        qr_png_b64 = make_qr_png_b64(readable_summary)
         db.save_invoice(fid, inv_number, inv_client, inv_desc, inv_amount,
                         vat_amount, total_incl_vat, inv_vat_number, issued_at, payload_b64)
         st.session_state["_last_invoice"] = {
-            "qr": qr_png_b64, "payload": payload_b64, "number": inv_number,
+            "payload": payload_b64, "number": inv_number,
             "client": inv_client, "desc": inv_desc, "amount": inv_amount,
             "vat": vat_amount, "total": total_incl_vat, "issued_at": issued_at,
         }
@@ -1716,16 +1690,11 @@ with tab_invoice:
 
     if "_last_invoice" in st.session_state:
         li = st.session_state["_last_invoice"]
-        qc1, qc2 = st.columns([1, 2])
-        with qc1:
-            st.image(base64.b64decode(li["qr"]), caption="امسح الرمز لعرض تفاصيل الفاتورة", width=200)
-        with qc2:
-            st.caption("رمز QR أعلاه يعرض تفاصيل الفاتورة مباشرةً عند مسحه بكاميرا أي جوال.")
-            with st.expander("الحمولة القياسية المعتمدة في فوترة (ZATCA) — TLV Base64"):
-                st.caption("في نظام فوترة معتمد فعلياً يحمل رمز QR هذه البيانات المرمَّزة بدل "
-                           "النص المقروء، لتُقرأ آلياً من أنظمة الجهة الضريبية. نعرضها هنا "
-                           "للتوثيق التقني، وهي المحفوظة في قاعدة البيانات مع الفاتورة.")
-                st.code(li["payload"], language=None)
+        with st.expander("الحمولة القياسية المعتمدة في فوترة (ZATCA)، ترميز TLV Base64"):
+            st.caption("هذه هي البيانات المرمَّزة وفق ترميز فوترة (ZATCA) المرحلة الأولى، "
+                       "تحتوي الحقول الخمسة الإلزامية، ومحفوظة في قاعدة البيانات مع الفاتورة "
+                       "للتوثيق التقني.")
+            st.code(li["payload"], language=None)
 
         inv_doc_inner = f"""<div class="head">
   <img src="data:image/jpeg;base64,{LOGO_B64}" style="height:60px;margin-bottom:8px">
@@ -1743,10 +1712,6 @@ with tab_invoice:
   <tr><th>ضريبة القيمة المضافة (15%)</th><td>{li['vat']:,.2f} {_riyal_doc}</td></tr>
 </table>
 <div class="score">الإجمالي شامل الضريبة<br><b>{li['total']:,.2f} {_riyal_doc}</b></div>
-<div style="text-align:center;margin-top:18px">
-  <img src="data:image/png;base64,{li['qr']}" style="height:150px">
-  <p style="color:#6b7c72;font-size:12px">رمز QR متوافق مع ترميز فوترة (ZATCA) المرحلة الأولى</p>
-</div>
 <div class="foot">
   هذا نموذج أوّلي لأغراض الهاكاثون، وليس فاتورة ضريبية معتمدة رسمياً.<br>
   مستقل · Mustaqil، هاكاثون أمد · مصرف الإنماء × أكاديمية طويق.
