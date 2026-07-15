@@ -2,7 +2,7 @@
 
 الرفيق المالي الذكي للفريلانسر السعودي، هاكاثون أمد، مصرف الإنماء × أكاديمية طويق.
 
-**التطبيق مباشرة على الإنترنت:** https://mustaqillive-2jm5amaz5wcfsumluze3vb.streamlit.app/
+**التطبيق مباشرة على الإنترنت:** https://mustaqil-project.streamlit.app/
 
 للتشغيل المحلي وتفاصيل الملفات والتبويبات، راجع [README_v2.txt](README_v2.txt).
 
